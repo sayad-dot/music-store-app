@@ -1,0 +1,15 @@
+{
+  "name": "music-store-app",
+  "version": "1.0.0",
+  "description": "Music Store Application with generated songs and audio",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": ["music", "react", "nodejs", "typescript"],
+  "author": "Your Name",
+  "license": "MIT"
+}
