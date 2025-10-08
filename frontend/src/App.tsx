@@ -37,7 +37,7 @@ const App: React.FC = () => {
       language: state.language,
       averageLikes: state.averageLikes,
       page: page,
-      pageSize: state.displayMode === 'table' ? 10 : 20
+      pageSize: state.displayMode === 'table' ? 5 : 10
     };
 
     try {

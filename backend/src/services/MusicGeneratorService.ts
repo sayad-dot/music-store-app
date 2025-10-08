@@ -223,68 +223,49 @@ export class MusicGeneratorService {
     return `data:audio/wav;base64,${this.generateMelody(seed)}`;
   }
 
-  private generateMelody(seed: string): string {
-    const rng = seedrandom(seed);
-    const duration = 5;
-    const sampleRate = 44100;
-    
-    // Musical notes in Hz (pentatonic scale for better sound)
-    const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; // C, D, E, G, A, C
-    const beatsPerSecond = 2;
-    const totalBeats = duration * beatsPerSecond;
-    const samples = duration * sampleRate;
-    const buffer = new ArrayBuffer(44 + samples * 2);
-    const view = new DataView(buffer);
-    
-    // Write WAV header
-    const writeString = (offset: number, string: string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    };
-    
-    writeString(0, 'RIFF');
-    view.setUint32(4, 36 + samples * 2, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(36, 'data');
-    view.setUint32(40, samples * 2, true);
-    
-    let offset = 44;
-    const samplesPerBeat = sampleRate / beatsPerSecond;
-    
-    for (let beat = 0; beat < totalBeats; beat++) {
-      const noteIndex = Math.floor(rng() * notes.length);
-      const frequency = notes[noteIndex];
-      const beatSamples = Math.min(samplesPerBeat, samples - (beat * samplesPerBeat));
-      
-      for (let i = 0; i < beatSamples; i++) {
-        const globalSample = beat * samplesPerBeat + i;
-        if (globalSample >= samples) break;
-        
-        const vibrato = 1 + 0.005 * Math.sin(2 * Math.PI * 5 * globalSample / sampleRate);
-        const envelope = Math.exp(-0.001 * (i % samplesPerBeat));
-        const sample = Math.sin(2 * Math.PI * frequency * vibrato * globalSample / sampleRate) * envelope;
-        const harmonic1 = 0.3 * Math.sin(2 * Math.PI * frequency * 2 * globalSample / sampleRate) * envelope;
-        const harmonic2 = 0.2 * Math.sin(2 * Math.PI * frequency * 3 * globalSample / sampleRate) * envelope;
-        const value = (sample + harmonic1 + harmonic2) * 0.7 * 0x7FFF;
-        view.setInt16(offset, value, true);
-        offset += 2;
-      }
+private generateMelody(seed: string): string {
+  const rng = seedrandom(seed);
+  
+  // Drastically simplified - single note, very short
+  const duration = 1; // Reduced from 5 to 1 second
+  const sampleRate = 11025; // Reduced from 44100
+  const frequency = 440.00; // Single A note instead of complex melody
+  
+  const samples = duration * sampleRate;
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+  
+  // Write WAV header
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
     }
-    
-    while (offset < 44 + samples * 2) {
-      view.setInt16(offset, 0, true);
-      offset += 2;
-    }
-    
-    return Buffer.from(buffer).toString('base64');
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + samples * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, samples * 2, true);
+  
+  let offset = 44;
+  
+  // Generate simple sine wave - much faster
+  for (let i = 0; i < samples; i++) {
+    const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate);
+    const value = sample * 0.7 * 0x7FFF;
+    view.setInt16(offset, value, true);
+    offset += 2;
   }
+  
+  return Buffer.from(buffer).toString('base64');
+}
 }
