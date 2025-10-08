@@ -30,7 +30,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({
       >
         <div className="songs-grid">
           {songs.map((song) => (
-            <div key={song.id} className="song-card">
+            <div key={`song-${song.id}`} className="song-card">
               <div className="card-header">
                 <img src={song.coverImage} alt={`Cover for ${song.title}`} />
                 <div className="card-info">
