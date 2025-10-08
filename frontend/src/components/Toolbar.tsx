@@ -1,3 +1,4 @@
+// frontend/src/components/Toolbar.tsx
 import React from 'react';
 
 interface ToolbarProps {
@@ -34,6 +35,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           <option value="en-US">English (USA)</option>
           <option value="de-DE">German (Germany)</option>
+          <option value="uk-UA">Ukrainian (Ukraine)</option>
         </select>
       </div>
 
@@ -44,7 +46,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           type="text"
           value={seed}
           onChange={(e) => onSeedChange(e.target.value)}
-          placeholder="Enter 64-bit seed"
+          placeholder="Enter seed value"
         />
         <button type="button" onClick={onRandomSeed}>
           Random

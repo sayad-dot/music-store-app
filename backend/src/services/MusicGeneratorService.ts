@@ -1,87 +1,36 @@
 // backend/src/services/MusicGeneratorService.ts
 import seedrandom from 'seedrandom';
-import { Song, GenerationParams, LanguageData } from '../types';
+import { faker, fakerDE, fakerUK } from '@faker-js/faker';
+import { Song, GenerationParams } from '../types';
 
 export class MusicGeneratorService {
-  private languageData: Map<string, LanguageData> = new Map();
-
-  constructor() {
-    this.initializeLanguageData();
-  }
-
-  private initializeLanguageData() {
-    // English data
-    this.languageData.set('en-US', {
-      songTitles: [
-        'Electric Dreams', 'Midnight City', 'Neon Lights', 'Digital Love',
-        'Cosmic Dance', 'Urban Legend', 'Silent Storm', 'Echo Chamber',
-        'Virtual Reality', 'Chemical Romance', 'Solar Flare', 'Ocean Deep',
-        'Mountain High', 'Desert Wind', 'Arctic Circle'
-      ],
-      artistNames: [
-        'The Neon Tigers', 'Electric Pulse', 'Crystal Method', 'Digital Dawn',
-        'Solar System', 'Urban Myth', 'Cosmic String', 'Virtual Void',
-        'Chemical Brothers', 'Arctic Monkeys', 'Kings of Leon', 'Florence + Machine',
-        'Imagine Dragons', 'Arcade Fire', 'Vampire Weekend'
-      ],
-      albumNames: [
-        'Digital Revolution', 'Echoes of Tomorrow', 'Neon Dreams', 'Urban Tales',
-        'Cosmic Journey', 'Electric Memories', 'Virtual Landscape', 'Chemical Reactions',
-        'Solar Power', 'Ocean Waves', 'Mountain Echoes', 'Desert Sun'
-      ],
-      genres: [
-        'Rock', 'Pop', 'Electronic', 'Hip Hop', 'Jazz', 'Classical',
-        'Country', 'R&B', 'Reggae', 'Metal', 'Folk', 'Blues'
-      ],
-      reviewTemplates: [
-        'A masterpiece that transcends genres.',
-        'Innovative sound that pushes boundaries.',
-        'Emotional journey from start to finish.',
-        'Perfect blend of melody and rhythm.',
-        'Lyrics that speak to the soul.'
-      ]
-    });
-
-    // German data
-    this.languageData.set('de-DE', {
-      songTitles: [
-        'Elektrische Träume', 'Mitternachtsstadt', 'Neonlichter', 'Digitale Liebe',
-        'Kosmischer Tanz', 'Urbane Legende', 'Stiller Sturm', 'Echo Kammer'
-      ],
-      artistNames: [
-        'Die Neon Tiger', 'Elektrischer Puls', 'Kristall Methode', 'Digitale Dämmerung',
-        'Sonnensystem', 'Urbanner Mythos', 'Kosmische Saite', 'Virtuelle Leere'
-      ],
-      albumNames: [
-        'Digitale Revolution', 'Echos von Morgen', 'Neon Träume', 'Urbane Geschichten',
-        'Kosmische Reise', 'Elektrische Erinnerungen', 'Virtuelle Landschaft'
-      ],
-      genres: [
-        'Rock', 'Pop', 'Elektronisch', 'Hip Hop', 'Jazz', 'Klassisch',
-        'Country', 'R&B', 'Reggae', 'Metal', 'Volksmusik', 'Blues'
-      ],
-      reviewTemplates: [
-        'Ein Meisterwerk, das Genres transzendiert.',
-        'Innovativer Sound, der Grenzen verschiebt.',
-        'Emotionale Reise von Anfang bis Ende.',
-        'Perfekte Mischung aus Melodie und Rhythmus.'
-      ]
-    });
+  private getFakerInstance(language: string) {
+    switch (language) {
+      case 'de-DE':
+        return fakerDE;
+      case 'uk-UA':
+        return fakerUK;
+      default:
+        return faker;
+    }
   }
 
   generateSongs(params: GenerationParams): Song[] {
     const songs: Song[] = [];
-    const languageData = this.languageData.get(params.language) || this.languageData.get('en-US')!;
     
     for (let i = 0; i < params.pageSize; i++) {
       const recordIndex = (params.page - 1) * params.pageSize + i;
       const songSeed = this.combineSeed(params.seed, recordIndex);
       
-      const rng = seedrandom(songSeed);
-      const title = this.pickRandom(languageData.songTitles, rng);
-      const artist = this.pickRandom(languageData.artistNames, rng);
-      const album = rng() > 0.3 ? this.pickRandom(languageData.albumNames, rng) : 'Single';
-      const genre = this.pickRandom(languageData.genres, rng);
+      const fakerInstance = this.getFakerInstance(params.language);
+      
+      // Seed the faker instance for reproducibility
+      fakerInstance.seed(parseInt(songSeed.substring(0, 10), 36));
+      
+      const title = this.generateSongTitle(fakerInstance);
+      const artist = this.generateArtistName(fakerInstance);
+      const album = fakerInstance.datatype.boolean(0.7) ? this.generateAlbumName(fakerInstance) : 'Single';
+      const genre = this.generateGenre(fakerInstance);
       
       // Generate likes using fractional method
       const likesRng = seedrandom(`likes_${songSeed}`);
@@ -92,13 +41,12 @@ export class MusicGeneratorService {
         likes++;
       }
 
-      // Generate reviews
+      // Generate reviews with proper seeding
       const reviewRng = seedrandom(`reviews_${songSeed}`);
-      const reviewCount = Math.floor(reviewRng() * 3) + 1; // 1-3 reviews
-      const reviews = Array.from({ length: reviewCount }, (_, idx) => {
-        const template = this.pickRandom(languageData.reviewTemplates, reviewRng);
-        return `${template} ${this.generateReviewText(reviewRng)}`;
-      });
+      const reviewCount = Math.floor(reviewRng() * 3) + 1;
+      const reviews = Array.from({ length: reviewCount }, (_, idx) => 
+        this.generateReview(fakerInstance, reviewRng)
+      );
 
       songs.push({
         id: recordIndex + 1,
@@ -110,7 +58,7 @@ export class MusicGeneratorService {
         coverImage: this.generateCoverImage(songSeed, title, artist),
         audioPreview: this.generateAudioPreview(songSeed),
         reviews,
-        lyrics: this.generateLyrics(songSeed, languageData)
+        lyrics: this.generateLyrics(fakerInstance, songSeed)
       });
     }
 
@@ -118,7 +66,6 @@ export class MusicGeneratorService {
   }
 
   private combineSeed(baseSeed: string, index: number): string {
-    // Simple MAD operation for combining seed and index
     const prime = 1000003;
     let hash = 0;
     for (let i = 0; i < baseSeed.length; i++) {
@@ -127,20 +74,148 @@ export class MusicGeneratorService {
     return `${(hash ^ index * prime) >>> 0}`;
   }
 
-  private pickRandom<T>(array: T[], rng: () => number): T {
-    return array[Math.floor(rng() * array.length)];
+  private generateSongTitle(fakerInstance: any): string {
+    const patterns = [
+      () => `${fakerInstance.word.adjective()} ${fakerInstance.word.noun()}`,
+      () => `${fakerInstance.word.noun()} ${fakerInstance.word.preposition()} ${fakerInstance.word.noun()}`,
+      () => `${fakerInstance.word.verb()}ing ${fakerInstance.word.adverb()}`,
+      () => `${fakerInstance.word.adjective()} ${fakerInstance.word.noun()} ${fakerInstance.word.noun()}`,
+      () => `${fakerInstance.word.noun()} ${fakerInstance.number.int({ min: 1, max: 100 })}`,
+      () => `The ${fakerInstance.word.adjective()} ${fakerInstance.word.noun()}`,
+    ];
+    
+    const pattern = fakerInstance.helpers.arrayElement(patterns);
+    return this.capitalize(pattern());
+  }
+
+  private generateArtistName(fakerInstance: any): string {
+    const patterns = [
+      () => fakerInstance.person.fullName(),
+      () => `${fakerInstance.person.firstName()} ${fakerInstance.person.lastName()}`,
+      () => `The ${fakerInstance.word.adjective()} ${fakerInstance.word.noun()}s`,
+      () => `${fakerInstance.word.adjective()} ${fakerInstance.word.noun()}`,
+      () => `${fakerInstance.person.firstName()} and the ${fakerInstance.word.noun()}s`,
+      () => `${fakerInstance.word.noun()} ${fakerInstance.word.noun()}`,
+    ];
+    
+    const pattern = fakerInstance.helpers.arrayElement(patterns);
+    return this.capitalize(pattern());
+  }
+
+  private generateAlbumName(fakerInstance: any): string {
+    const patterns = [
+      () => `${fakerInstance.word.adjective()} ${fakerInstance.word.noun()}`,
+      () => `${fakerInstance.word.noun()} ${fakerInstance.word.preposition()} ${fakerInstance.word.noun()}`,
+      () => `The ${fakerInstance.word.adjective()} ${fakerInstance.word.noun()}`,
+      () => fakerInstance.company.catchPhrase(),
+      () => `${fakerInstance.word.noun()}s ${fakerInstance.word.preposition()} ${fakerInstance.word.noun()}`,
+    ];
+    
+    const pattern = fakerInstance.helpers.arrayElement(patterns);
+    return this.capitalize(pattern());
+  }
+
+  private generateGenre(fakerInstance: any): string {
+    // Use Faker's music genre when available, fallback to creative combinations
+    try {
+      return fakerInstance.music.genre();
+    } catch {
+      const genres = [
+        'Rock', 'Pop', 'Electronic', 'Hip Hop', 'Jazz', 'Classical',
+        'Country', 'R&B', 'Reggae', 'Metal', 'Folk', 'Blues'
+      ];
+      const baseGenre = fakerInstance.helpers.arrayElement(genres);
+      const prefixes = ['Alternative', 'Indie', 'Experimental', 'Progressive', 'Acoustic'];
+      const suffixes = ['Fusion', 'Core', 'Wave', 'Rock', 'Pop'];
+      
+      if (fakerInstance.datatype.boolean()) {
+        return `${fakerInstance.helpers.arrayElement(prefixes)} ${baseGenre}`;
+      }
+      return baseGenre;
+    }
+  }
+
+  private generateReview(fakerInstance: any, rng: () => number): string {
+    const templates = [
+      () => `${fakerInstance.word.adjective()} ${fakerInstance.word.noun()} with ${fakerInstance.word.adjective()} ${fakerInstance.word.noun()}.`,
+      () => `${fakerInstance.hacker.phrase()}`,
+      () => `${fakerInstance.company.catchPhrase()}`,
+      () => `The ${fakerInstance.word.adjective()} ${fakerInstance.word.noun()} really ${fakerInstance.word.verb()}s.`,
+      () => `${fakerInstance.word.adjective().charAt(0).toUpperCase() + fakerInstance.word.adjective().slice(1)} performance throughout!`,
+    ];
+    
+    const template = fakerInstance.helpers.arrayElement(templates);
+    return this.capitalize(template());
+  }
+
+  private generateLyrics(fakerInstance: any, seed: string): string[] {
+    const lyricRng = seedrandom(`lyrics_${seed}`);
+    const lineCount = 8 + Math.floor(lyricRng() * 8);
+    const lines: string[] = [];
+    
+    for (let i = 0; i < lineCount; i++) {
+      const wordCount = 3 + Math.floor(lyricRng() * 5);
+      const words: string[] = [];
+      
+      for (let j = 0; j < wordCount; j++) {
+        const wordTypes = [
+          () => fakerInstance.word.noun(),
+          () => fakerInstance.word.verb(),
+          () => fakerInstance.word.adjective(),
+          () => fakerInstance.word.adverb(),
+        ];
+        
+        const wordType = fakerInstance.helpers.arrayElement(wordTypes);
+        words.push(wordType());
+      }
+      
+      lines.push(this.capitalize(words.join(' ')));
+    }
+    
+    return lines;
+  }
+
+  private capitalize(str: string): string {
+    return str
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   }
 
   private generateCoverImage(seed: string, title: string, artist: string): string {
     const rng = seedrandom(seed);
-    const color = Math.floor(rng() * 0xFFFFFF).toString(16).padStart(6, '0');
+    const hue = Math.floor(rng() * 360);
+    const saturation = 60 + Math.floor(rng() * 40);
+    const lightness = 40 + Math.floor(rng() * 30);
+    const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    
+    // Generate a second color for gradient
+    const hue2 = (hue + 60 + Math.floor(rng() * 120)) % 360;
+    const color2 = `hsl(${hue2}, ${saturation}%, ${lightness}%)`;
+    
+    // Truncate text to fit
+    const maxTitleLength = 25;
+    const maxArtistLength = 20;
+    const truncatedTitle = title.length > maxTitleLength ? title.substring(0, maxTitleLength) + '...' : title;
+    const truncatedArtist = artist.length > maxArtistLength ? artist.substring(0, maxArtistLength) + '...' : artist;
+    
     const svg = `
       <svg width="300" height="300" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="#${color}"/>
-        <text x="50%" y="45%" text-anchor="middle" fill="white" font-family="Arial" font-size="20">${title}</text>
-        <text x="50%" y="60%" text-anchor="middle" fill="white" font-family="Arial" font-size="16">${artist}</text>
+        <defs>
+          <linearGradient id="grad${seed}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
+            <stop offset="100%" style="stop-color:${color2};stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grad${seed})"/>
+        <circle cx="${150 + (rng() - 0.5) * 100}" cy="${150 + (rng() - 0.5) * 100}" r="${30 + rng() * 50}" fill="rgba(255,255,255,0.1)"/>
+        <circle cx="${150 + (rng() - 0.5) * 100}" cy="${150 + (rng() - 0.5) * 100}" r="${20 + rng() * 40}" fill="rgba(255,255,255,0.1)"/>
+        <rect x="20" y="110" width="260" height="80" fill="rgba(0,0,0,0.6)" rx="8"/>
+        <text x="150" y="145" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="18" font-weight="bold">${truncatedTitle}</text>
+        <text x="150" y="170" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14">${truncatedArtist}</text>
       </svg>
     `;
+    
     return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
   }
 
@@ -150,14 +225,13 @@ export class MusicGeneratorService {
 
   private generateMelody(seed: string): string {
     const rng = seedrandom(seed);
-    const duration = 5; // 5 seconds
+    const duration = 5;
     const sampleRate = 44100;
     
-    // Musical notes in Hz (C major scale)
-    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // C4 to C5
-    const beatsPerSecond = 2; // 2 beats per second
+    // Musical notes in Hz (pentatonic scale for better sound)
+    const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; // C, D, E, G, A, C
+    const beatsPerSecond = 2;
     const totalBeats = duration * beatsPerSecond;
-    
     const samples = duration * sampleRate;
     const buffer = new ArrayBuffer(44 + samples * 2);
     const view = new DataView(buffer);
@@ -183,7 +257,6 @@ export class MusicGeneratorService {
     writeString(36, 'data');
     view.setUint32(40, samples * 2, true);
     
-    // Generate melody with multiple notes
     let offset = 44;
     const samplesPerBeat = sampleRate / beatsPerSecond;
     
@@ -196,71 +269,22 @@ export class MusicGeneratorService {
         const globalSample = beat * samplesPerBeat + i;
         if (globalSample >= samples) break;
         
-        // Add some variation to make it more musical
         const vibrato = 1 + 0.005 * Math.sin(2 * Math.PI * 5 * globalSample / sampleRate);
-        const envelope = Math.exp(-0.0005 * (i % samplesPerBeat)); // Simple decay
+        const envelope = Math.exp(-0.001 * (i % samplesPerBeat));
         const sample = Math.sin(2 * Math.PI * frequency * vibrato * globalSample / sampleRate) * envelope;
-        
-        // Add some harmonics for richer sound
         const harmonic1 = 0.3 * Math.sin(2 * Math.PI * frequency * 2 * globalSample / sampleRate) * envelope;
         const harmonic2 = 0.2 * Math.sin(2 * Math.PI * frequency * 3 * globalSample / sampleRate) * envelope;
-        
-        const value = (sample + harmonic1 + harmonic2) * 0.7 * 0x7FFF; // Reduce volume slightly
+        const value = (sample + harmonic1 + harmonic2) * 0.7 * 0x7FFF;
         view.setInt16(offset, value, true);
         offset += 2;
       }
     }
     
-    // Fill remaining samples with silence if any
     while (offset < 44 + samples * 2) {
       view.setInt16(offset, 0, true);
       offset += 2;
     }
     
     return Buffer.from(buffer).toString('base64');
-  }
-
-  private generateReviewText(rng: () => number): string {
-    const adjectives = ['amazing', 'incredible', 'fantastic', 'wonderful', 'brilliant'];
-    const nouns = ['production', 'composition', 'arrangement', 'performance', 'energy'];
-    return `The ${this.pickRandom(adjectives, rng)} ${this.pickRandom(nouns, rng)} stands out.`;
-  }
-
-  private generateLyrics(seed: string, languageData: LanguageData): string[] {
-    const lyricRng = seedrandom(`lyrics_${seed}`);
-    const lines = [];
-    const lineCount = 8 + Math.floor(lyricRng() * 8); // 8-16 lines
-    
-    for (let i = 0; i < lineCount; i++) {
-      const words = [];
-      const wordCount = 3 + Math.floor(lyricRng() * 5); // 3-8 words per line
-      
-      for (let j = 0; j < wordCount; j++) {
-        const word = this.generateLyricWord(lyricRng);
-        words.push(word);
-      }
-      
-      lines.push(words.join(' '));
-    }
-    
-    return lines;
-  }
-
-  private generateLyricWord(rng: () => number): string {
-    const syllables = ['love', 'heart', 'dream', 'light', 'dark', 'fire', 'water', 'earth', 'air', 'time', 'night', 'day', 'sky', 'sea', 'star', 'moon', 'sun', 'rain', 'wind', 'snow'];
-    const prefixes = ['be', 're', 'un', 'dis', 'pre', 'for', 'with', 'out'];
-    const suffixes = ['ing', 'ed', 'ly', 'ness', 'ment', 'ful', 'less', 'able'];
-    
-    let word = this.pickRandom(syllables, rng);
-    
-    if (rng() > 0.7) {
-      word = this.pickRandom(prefixes, rng) + word;
-    }
-    
-    if (rng() > 0.7) {
-      word = word + this.pickRandom(suffixes, rng);
-    }
-    
-    return word;
   }
 }
