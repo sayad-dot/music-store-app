@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Song, AppState, GenerationParams } from './types';
 import { musicApi } from './services/api';
 import Toolbar from './components/Toolbar';
@@ -19,7 +19,15 @@ const App: React.FC = () => {
   });
 
   const [gallerySongs, setGallerySongs] = useState<Song[]>([]);
+  const [galleryPage, setGalleryPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  
+  // Track previous parameters to detect changes
+  const prevParamsRef = useRef({ 
+    seed: state.seed, 
+    language: state.language, 
+    averageLikes: state.averageLikes 
+  });
 
   const fetchSongs = useCallback(async (page: number, append: boolean = false) => {
     setState(prev => ({ ...prev, isLoading: true }));
@@ -35,17 +43,16 @@ const App: React.FC = () => {
     try {
       const newSongs = await musicApi.getSongs(params);
       
-      if (state.displayMode === 'gallery' && append) {
-        setGallerySongs(prev => [...prev, ...newSongs]);
-      } else if (state.displayMode === 'gallery') {
-        setGallerySongs(newSongs);
+      if (state.displayMode === 'gallery') {
+        if (append) {
+          setGallerySongs(prev => [...prev, ...newSongs]);
+        } else {
+          setGallerySongs(newSongs);
+          setGalleryPage(1);
+        }
+        setHasMore(newSongs.length === 20);
       } else {
         setState(prev => ({ ...prev, songs: newSongs }));
-      }
-      
-      // Check if we have more songs to load (for gallery view)
-      if (state.displayMode === 'gallery') {
-        setHasMore(newSongs.length === 20); // If we got less than pageSize, we've reached the end
       }
       
       setState(prev => ({ ...prev, isLoading: false }));
@@ -55,16 +62,38 @@ const App: React.FC = () => {
     }
   }, [state.seed, state.language, state.averageLikes, state.displayMode]);
 
+  // Effect for table view
   useEffect(() => {
     if (state.displayMode === 'table') {
       fetchSongs(state.currentPage);
-    } else {
-      // Reset gallery when switching to gallery mode or when parameters change
-      setGallerySongs([]);
-      setHasMore(true);
-      fetchSongs(1);
     }
-  }, [state.seed, state.language, state.averageLikes, state.displayMode, state.currentPage]);
+  }, [state.currentPage, state.displayMode]);
+
+  // Effect for gallery view and parameter changes
+  useEffect(() => {
+    const paramsChanged = 
+      prevParamsRef.current.seed !== state.seed ||
+      prevParamsRef.current.language !== state.language ||
+      prevParamsRef.current.averageLikes !== state.averageLikes;
+
+    if (paramsChanged || state.displayMode === 'gallery') {
+      // Reset gallery when parameters change
+      setGallerySongs([]);
+      setGalleryPage(1);
+      setHasMore(true);
+      
+      if (state.displayMode === 'gallery') {
+        fetchSongs(1, false);
+      }
+      
+      // Update previous params
+      prevParamsRef.current = {
+        seed: state.seed,
+        language: state.language,
+        averageLikes: state.averageLikes
+      };
+    }
+  }, [state.seed, state.language, state.averageLikes, state.displayMode, fetchSongs]);
 
   const handleLanguageChange = (language: string) => {
     setState(prev => ({ ...prev, language, currentPage: 1 }));
@@ -83,7 +112,11 @@ const App: React.FC = () => {
   };
 
   const handleRandomSeed = () => {
-    setState(prev => ({ ...prev, seed: Math.random().toString(36).substring(2, 15), currentPage: 1 }));
+    setState(prev => ({ 
+      ...prev, 
+      seed: Math.random().toString(36).substring(2, 15), 
+      currentPage: 1 
+    }));
   };
 
   const handlePageChange = (page: number) => {
@@ -92,13 +125,15 @@ const App: React.FC = () => {
 
   const handleLoadMore = () => {
     if (!state.isLoading && hasMore) {
-      const nextPage = Math.floor(gallerySongs.length / 20) + 1;
+      const nextPage = galleryPage + 1;
+      setGalleryPage(nextPage);
       fetchSongs(nextPage, true);
     }
   };
 
   return (
     <div className="app">
+      <h1 style={{ textAlign: 'center', marginBottom: '20px' }}>🎵 Music Store</h1>
       <Toolbar
         language={state.language}
         seed={state.seed}

@@ -29,8 +29,8 @@ const GalleryView: React.FC<GalleryViewProps> = ({
         useWindow={true}
       >
         <div className="songs-grid">
-          {songs.map((song) => (
-            <div key={`song-${song.id}`} className="song-card">
+          {songs.map((song, index) => (
+            <div key={`gallery-song-${song.id}-${index}`} className="song-card">
               <div className="card-header">
                 <img src={song.coverImage} alt={`Cover for ${song.title}`} />
                 <div className="card-info">
