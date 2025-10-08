@@ -4,7 +4,9 @@ import cors from 'cors';
 import { MusicController } from './controllers/MusicController';
 
 const app = express();
-const port = process.env.PORT || 3001;
+
+// Railway provides PORT via environment variable
+const port = parseInt(process.env.PORT || '3001', 10);
 
 // Configure CORS to allow requests from your Vercel frontend
 const corsOptions = {
@@ -32,8 +34,10 @@ app.get('/health', (req, res) => {
 app.get('/api/songs', musicController.getSongs);
 app.get('/api/audio/:seed', musicController.getAudioPreview);
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+// Listen on 0.0.0.0 to accept external connections
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 export default app;
